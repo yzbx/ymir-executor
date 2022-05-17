@@ -12,7 +12,8 @@ import mmcv
 import numpy as np
 from mmcv.utils import print_log
 from terminaltables import AsciiTable
-
+from executor import env
+import json
 from mmdet.core import eval_recalls
 from .api_wrappers import COCO, COCOeval
 from .builder import DATASETS
@@ -561,7 +562,14 @@ class CocoDataset(CustomDataset):
                             ap = float('nan')
                         results_per_category.append(
                             (f'{nm["name"]}', f'{float(ap):0.3f}'))
+                    
+                    training_result_file=env.get_current_env().output.training_result_file
+                    tmp_result_file = osp.splitext(training_result_file)[0]+'.json'
+                    assert tmp_result_file!=training_result_file, 'tmp result file must different from training_result_file'
 
+                    with open(tmp_result_file,'w') as fp:
+                        json.dump(results_per_category,fp)
+                        
                     num_columns = min(6, len(results_per_category) * 2)
                     results_flatten = list(
                         itertools.chain(*results_per_category))
