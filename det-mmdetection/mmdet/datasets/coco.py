@@ -568,7 +568,7 @@ class CocoDataset(CustomDataset):
                     assert tmp_result_file!=training_result_file, 'tmp result file must different from training_result_file'
 
                     with open(tmp_result_file,'w') as fp:
-                        json.dump(results_per_category,fp)
+                        json.dump({name:value for name,value in results_per_category},fp)
                         
                     num_columns = min(6, len(results_per_category) * 2)
                     results_flatten = list(

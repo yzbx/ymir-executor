@@ -1,4 +1,6 @@
+from genericpath import exists
 from pprint import PrettyPrinter
+from tabnanny import check
 from loguru import logger
 import yaml
 import os
@@ -9,6 +11,7 @@ import subprocess
 import argparse 
 
 from executor import env, monitor, result_writer as rw
+from mmdet.core.evaluation.eval_hooks import update_training_result_file
 
 def get_user_config(config, key_words, default_value):
     v = default_value
@@ -57,6 +60,8 @@ samples_per_gpu = max(1, batch_size//gpu_nums)
 workers_per_gpu = min(4, max(1, samples_per_gpu//2))
 model = get_user_config(executor_config, ['model'], 'yolox_nano')
 
+checkpoint = get_user_config(executor_config, ['checkpoint'], None)
+
 supported_models = []
 if model.startswith("faster_rcnn"):
     files = glob.glob(
@@ -77,12 +82,19 @@ else:
     supported_models = [osp.basename(f) for f in files]
 assert model in supported_models, f'unknown model {model}, not in {supported_models}'
 
+if checkpoint is None:
+    checkpoint_path = osp.join('/workspace/checkpoints',checkpoints_file)
+else:
+    checkpoint_path = checkpoint
+    assert osp.exists(checkpoint_path),f'{checkpoint_path} not exist'
+
 # modify base config file
 base_config_file = './configs/_base_/datasets/ymir_coco.py'
 
 modify_dict = dict(
     classes=classes,
     num_classes=num_classes,
+    max_epochs=max_epochs,
     lr=learning_rate,
     samples_per_gpu=samples_per_gpu,
     workers_per_gpu=workers_per_gpu,
@@ -93,7 +105,7 @@ modify_dict = dict(
     val_ann_file=env_config.input.val_index_file,
     tensorboard_dir=env_config.output.tensorboard_dir,
     work_dir=env_config.output.models_dir,
-    checkpoints_path=osp.join('/workspace/checkpoints',checkpoints_file)
+    checkpoints_path=checkpoint_path
 )
 
 logging.info(f'modified config is {modify_dict}')
@@ -135,5 +147,10 @@ logging.info(f"run command: {cmd}")
 # _run_command(cmd)
 # os.system(cmd)
 subprocess.check_output(cmd.split())
+
+# eval_hooks will generate training_result_file if current map is best.
+# create a fake map = 0 if no training_result_file generate in eval_hooks
+if not osp.exists(env_config.output.training_result_file):
+    update_training_result_file(0)
 
 monitor.write_monitor_logger(percent=1.0)

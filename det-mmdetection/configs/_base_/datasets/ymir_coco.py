@@ -15,7 +15,7 @@ tensorboard_dir = '/out/tensorboard'
 # optimizer
 lr = 0.01 
 weight_decay = 5e-4
-max_epochs = 300
+max_epochs = 10 
 samples_per_gpu = 8 
 workers_per_gpu = 4 
 # faster-rcnn lr=0.02, weight_decay=1e-4, max_epochs=100

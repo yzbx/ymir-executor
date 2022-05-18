@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import bisect
 import os.path as osp
+from random import weibullvariate
 
 import mmcv
 import warnings
@@ -10,7 +11,8 @@ from mmcv.runner import EvalHook as BaseEvalHook
 from torch.nn.modules.batchnorm import _BatchNorm
 from executor import env, result_writer as rw, monitor
 import json
-
+import os.path as osp
+import glob
 
 def _calc_dynamic_intervals(start_interval, dynamic_interval_list):
     assert mmcv.is_list_of(dynamic_interval_list, tuple)
@@ -32,9 +34,18 @@ def update_training_result_file(key_score):
     with open(tmp_result_file, 'r') as fp:
         results_per_category = json.load(fp)
 
-    rw.write_training_result(model_names=['model.pth', 'model.py'],
-                             map=key_score,
-                             class_aps=results_per_category)
+    work_dir = env.get_current_env().output.models_dir
+    model_config_file = glob.glob(osp.join(work_dir,'*.py'))[0]
+    weight_files = glob.glob(osp.join(work_dir,'best_bbox_mAP_epoch_*.pth'))
+    if len(weight_files) == 0:
+        weight_files = glob.glob(osp.join(work_dir,'epoch_*.pth'))
+
+    assert len(weight_files)>0
+    weight_files.sort(key=lambda fn:osp.getmtime(fn))
+    model_weight_file=osp.basename(weight_files[-1])
+    rw.write_training_result(model_names=[model_weight_file, osp.basename(model_config_file)],
+                             mAP=key_score,
+                             classAPs=results_per_category)
 
 
 class EvalHook(BaseEvalHook):

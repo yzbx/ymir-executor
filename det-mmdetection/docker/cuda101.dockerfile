@@ -37,7 +37,7 @@ ENV PYTHONPATH=.
 
 # tmi framework and your app
 COPY ./sample_executor /sample_executor
-RUN pip install -e /sample_executor/executor
+RUN pip install -e /sample_executor
 RUN mkdir /img-man
 COPY ./training/mmdetection/*-template.yaml /img-man/
 
