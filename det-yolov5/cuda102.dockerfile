@@ -31,17 +31,17 @@ ADD ./det-yolov5 /app
 # RUN pip install -r requirements.txt 
 
 # 如果在内网使用，需要提前下载好yolov5 v6.1的权重与字体Arial.tff到指定目录
-# COPY yolov5*.pt /app/
+# COPY ./yolov5*.pt /app/
 ### wget https://ultralytics.com/assets/Arial.ttf to /root/.config/Ultralytics/Arial.ttf
 # RUN mkdir -p /root/.config/Ultralytics
-# COPY ./training/yolov5/Arial.ttf /root/.config/Ultralytics/Arial.ttf
+# COPY ./det-yolov5/Arial.ttf /root/.config/Ultralytics/Arial.ttf
 
 # make PYTHONPATH include mmdetection and executor
 ENV PYTHONPATH=.
 
 # tmi framework and your app
 COPY sample_executor /sample_executor
-RUN pip install -e /sample_executor/executor
+RUN pip install -e /sample_executor
 RUN mkdir /img-man
 COPY ./det-yolov5/*-template.yaml /img-man/
 
