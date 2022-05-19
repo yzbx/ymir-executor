@@ -11,7 +11,7 @@ setup(
     description='ymir executor',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/IndustryEssentials/ymir-executor',
+    url='https://github.com/yzbx/ymir-executor@executor',
     author='youdaoyzbx',
     author_email='youdaoyzbx@163.com',
     classifiers=[
