@@ -1,13 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import bisect
 import os.path as osp
+from random import weibullvariate
 
 import mmcv
+import warnings
 import torch.distributed as dist
 from mmcv.runner import DistEvalHook as BaseDistEvalHook
 from mmcv.runner import EvalHook as BaseEvalHook
 from torch.nn.modules.batchnorm import _BatchNorm
-
+from executor import env, result_writer as rw, monitor
+import json
+import os.path as osp
+import glob
 
 def _calc_dynamic_intervals(start_interval, dynamic_interval_list):
     assert mmcv.is_list_of(dynamic_interval_list, tuple)
@@ -19,6 +24,28 @@ def _calc_dynamic_intervals(start_interval, dynamic_interval_list):
     dynamic_intervals.extend(
         [dynamic_interval[1] for dynamic_interval in dynamic_interval_list])
     return dynamic_milestones, dynamic_intervals
+
+
+def update_training_result_file(key_score):
+    training_result_file = env.get_current_env().output.training_result_file
+    tmp_result_file = osp.splitext(training_result_file)[0]+'.json'
+    assert tmp_result_file != training_result_file, 'tmp result file must different from training_result_file'
+
+    with open(tmp_result_file, 'r') as fp:
+        results_per_category = json.load(fp)
+
+    work_dir = env.get_current_env().output.models_dir
+    model_config_file = glob.glob(osp.join(work_dir,'*.py'))[0]
+    weight_files = glob.glob(osp.join(work_dir,'best_bbox_mAP_epoch_*.pth'))
+    if len(weight_files) == 0:
+        weight_files = glob.glob(osp.join(work_dir,'epoch_*.pth'))
+
+    assert len(weight_files)>0
+    weight_files.sort(key=lambda fn:osp.getmtime(fn))
+    model_weight_file=osp.basename(weight_files[-1])
+    rw.write_training_result(model_names=[model_weight_file, osp.basename(model_config_file)],
+                             mAP=key_score,
+                             classAPs=results_per_category)
 
 
 class EvalHook(BaseEvalHook):
@@ -43,6 +70,12 @@ class EvalHook(BaseEvalHook):
         self._decide_interval(runner)
         super().before_train_epoch(runner)
 
+    def after_train_epoch(self, runner):
+        """Report the training process for ymir"""
+        percent=0.95*(runner.epoch/runner.max_epochs)
+        monitor.write_monitor_logger(percent=percent)
+        super().after_train_epoch(runner)
+
     def before_train_iter(self, runner):
         self._decide_interval(runner)
         super().before_train_iter(runner)
@@ -60,11 +93,15 @@ class EvalHook(BaseEvalHook):
         # the best checkpoint
         if self.save_best and key_score:
             self._save_ckpt(runner, key_score)
-
-
+            best_score = runner.meta['hook_msgs'].get(
+                'best_score', self.init_value_map[self.rule])
+            if self.compare_func(key_score, best_score):
+                update_training_result_file(key_score)
 # Note: Considering that MMCV's EvalHook updated its interface in V1.3.16,
 # in order to avoid strong version dependency, we did not directly
 # inherit EvalHook but BaseDistEvalHook.
+
+
 class DistEvalHook(BaseDistEvalHook):
 
     def __init__(self, *args, dynamic_intervals=None, **kwargs):
@@ -86,6 +123,12 @@ class DistEvalHook(BaseDistEvalHook):
         """Evaluate the model only at the start of training by epoch."""
         self._decide_interval(runner)
         super().before_train_epoch(runner)
+
+    def after_train_epoch(self, runner):
+        """Report the training process for ymir"""
+        percent=0.1+0.8*(runner.epoch/runner.max_epochs)
+        monitor.write_monitor_logger(percent=percent)
+        super().after_train_epoch(runner)
 
     def before_train_iter(self, runner):
         self._decide_interval(runner)
@@ -128,3 +171,8 @@ class DistEvalHook(BaseDistEvalHook):
             # the action to save the best checkpoint
             if self.save_best and key_score:
                 self._save_ckpt(runner, key_score)
+
+                best_score = runner.meta['hook_msgs'].get(
+                    'best_score', self.init_value_map[self.rule])
+                if self.compare_func(key_score, best_score):
+                    update_training_result_file(key_score)
