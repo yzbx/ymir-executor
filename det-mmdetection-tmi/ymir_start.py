@@ -27,6 +27,16 @@ def get_args():
 
     return parser.parse_args()
 
+model_to_url=dict(
+    faster_rcnn_r50_fpn='https://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r50_fpn_1x_coco/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth',
+    faster_rcnn_r101_fpn='https://download.openmmlab.com/mmdetection/v2.0/faster_rcnn/faster_rcnn_r101_fpn_1x_coco/faster_rcnn_r101_fpn_1x_coco_20200130-f513f705.pth',
+    yolox_tiny='https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth',
+    yolox_s='https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth',
+    yolox_l='https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_l_8x8_300e_coco/yolox_l_8x8_300e_coco_20211126_140236-d3bd2b23.pth',
+    yolox_x='https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_x_8x8_300e_coco/yolox_x_8x8_300e_coco_20211126_140254-1ef88d67.pth',
+    yolox_nano='https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth'
+)
+
 # the directory info
 env_config = env.get_current_env()
 # config_file = "/in/config.yaml"
@@ -60,7 +70,7 @@ samples_per_gpu = max(1, batch_size//gpu_nums)
 workers_per_gpu = min(4, max(1, samples_per_gpu//2))
 model = get_user_config(executor_config, ['model'], 'yolox_nano')
 
-checkpoint = get_user_config(executor_config, ['checkpoint'], None)
+pretrain = get_user_config(executor_config, ['pretrain'], False)
 
 supported_models = []
 if model.startswith("faster_rcnn"):
@@ -68,25 +78,28 @@ if model.startswith("faster_rcnn"):
         osp.join('configs/faster_rcnn/faster_rcnn_*_ymir_coco.py'))
     supported_models = ['faster_rcnn_r50_fpn', 'faster_rcnn_r101_fpn']
 
-    if model=='faster_rcnn_r50_fpn':
-        checkpoints_file='resnet50-11ad3fa6.pth'
-    else:
-        checkpoints_file='resnet101-cd907fc2.pth'
+    # if model=='faster_rcnn_r50_fpn':
+    #     checkpoints_file='resnet50-11ad3fa6.pth'
+    # else:
+    #     checkpoints_file='resnet101-cd907fc2.pth'
 elif model.startswith("yolox"):
     files = glob.glob(osp.join('configs/yolox/yolox_*_8x8_300e_ymir_coco.py'))
     supported_models = ['yolox_nano', 'yolox_tiny',
                         'yolox_s', 'yolox_m', 'yolox_l', 'yolox_x']
-    checkpoints_file=model+'.pth'
+    # checkpoints_file=model+'.pth'
 else:
     files = glob.glob(osp.join('configs/*/*_ymir_coco.py'))
     supported_models = [osp.basename(f) for f in files]
+
 assert model in supported_models, f'unknown model {model}, not in {supported_models}'
 
-if checkpoint is None:
-    checkpoint_path = osp.join('/workspace/checkpoints',checkpoints_file)
+if pretrain:
+    if len(pretrained_model_paths) > 0:
+        checkpoint_file=pretrained_model_paths[0]
+    else:
+        checkpoint_file=model_to_url[model]
 else:
-    checkpoint_path = checkpoint
-    assert osp.exists(checkpoint_path),f'{checkpoint_path} not exist'
+    checkpoint_file=None
 
 # modify base config file
 base_config_file = './configs/_base_/datasets/ymir_coco.py'
@@ -105,7 +118,7 @@ modify_dict = dict(
     val_ann_file=env_config.input.val_index_file,
     tensorboard_dir=env_config.output.tensorboard_dir,
     work_dir=env_config.output.models_dir,
-    checkpoints_path=checkpoint_path
+    checkpoints_path=checkpoint_file
 )
 
 logging.info(f'modified config is {modify_dict}')

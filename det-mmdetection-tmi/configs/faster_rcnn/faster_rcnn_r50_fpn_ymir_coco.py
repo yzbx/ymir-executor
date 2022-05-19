@@ -1,6 +1,5 @@
 _base_ = ['../_base_/datasets/ymir_coco.py']
 
-checkpoints_path={{_base_.checkpoints_path}}
 dataset_type = {{_base_.dataset_type}}
 data_root = {{_base_.data_root}}
 train_ann_file = {{_base_.train_ann_file}}
@@ -28,9 +27,7 @@ model = dict(
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
-        style='pytorch',
-        init_cfg=dict(type='Pretrained', 
-            checkpoint=checkpoints_path)),
+        style='pytorch'),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],

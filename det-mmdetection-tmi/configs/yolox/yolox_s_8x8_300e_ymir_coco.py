@@ -1,7 +1,6 @@
 _base_ = ['../_base_/datasets/ymir_coco.py']
 
 img_scale = (640, 640)
-checkpoints_path={{_base_.checkpoints_path}}
 dataset_type = {{_base_.dataset_type}}
 data_root = {{_base_.data_root}}
 train_ann_file = {{_base_.train_ann_file}}
@@ -36,9 +35,8 @@ model = dict(
     train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
     # In order to align the source code, the threshold of the val phase is
     # 0.01, and the threshold of the test phase is 0.001.
-    test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)),
-    init_cfg=dict(type='Pretrained', 
-            checkpoint=checkpoints_path))
+    test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65))
+)
 
 # dataset settings
 

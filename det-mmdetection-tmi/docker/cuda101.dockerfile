@@ -2,7 +2,7 @@ ARG PYTORCH="1.6.0"
 ARG CUDA="10.1"
 ARG CUDNN="7"
 
-# docker build -t mmcv/mmcv:gtx1080 . -f gtx1080.dockerfile
+# docker build -t ymir/mmcv:cuda101 . -f det-mmdetection-tmi/cuda101.dockerfile
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-runtime
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
@@ -11,6 +11,7 @@ ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
 ENV LANG=C.UTF-8
 
 RUN sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list && \
+	apt-get update && apt-get install gnupg2 && \
 	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC && \
 	apt-get update && apt-get install -y git ninja-build libglib2.0-0 libsm6 \
     libxrender-dev libxext6 libgl1-mesa-glx ffmpeg sudo openssh-server \
@@ -27,22 +28,26 @@ RUN pip install -i https://mirrors.aliyun.com/pypi/simple -U pip && \
 	pip install mmcv-full==1.4.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html && \
 	pip install openmim && mim install mmdet==2.22.0
 
-WORKDIR /app
-ADD ./det-mmdetection /app
-RUN mkdir -p /app/checkpoints
-COPY ./det-mmdetection/*.pth /app/checkpoints/
+
+ADD ./det-mmdetection-tmi /app
+RUN mkdir /img-man && cp /app/*-template.yaml /img-man/
+
+# download and copy weight file into docker image to make training faster.
+# RUN mkdir -p /app/checkpoints
+# COPY ./det-mmdetection-tmi/*.pth /app/checkpoints/
 
 # make PYTHONPATH include mmdetection and executor
 ENV PYTHONPATH=.
 
 # tmi framework and your app
-COPY ./sample_executor /sample_executor
-RUN pip install -e /sample_executor
-RUN mkdir /img-man
-COPY ./training/mmdetection/*-template.yaml /img-man/
+RUN git config --global user.name "yzbx" && \
+    git config --global user.email "youdaoyzbx@163.com" && \
+    git clone http://192.168.70.8/wangjiaxin/ymir-executor.git -b executor ~/.git/ymir-executor && \
+    pip install -e ~/.git/ymir-executor/executor
 
 # dependencies: write other dependencies here (pytorch, mxnet, tensorboard-x, etc.)
 
+WORKDIR /app
 # entry point for your app
 # the whole docker image will be started with `nvidia-docker run <other options> <docker-image-name>`
 # and this command will run automatically

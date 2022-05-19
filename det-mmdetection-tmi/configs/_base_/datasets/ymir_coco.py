@@ -1,4 +1,7 @@
-checkpoints_path = '/workspace/checkpoints/yolox_nano.pth' 
+# model path to load_from, support web url, all model support it.
+checkpoints_path = None
+# model path of backbone, faster_rcnn support it, yolox not support. 
+pretrain_path = ''
 ################################################################# supported config from ymir config.yaml
 # model settings
 num_classes = 19 
@@ -55,7 +58,7 @@ custom_hooks = [dict(type='NumClassCheckHook')]
 
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = None
+load_from = checkpoints_path
 resume_from = None
 workflow = [('train', 1)]
 work_dir = '/out/models' 
