@@ -2,7 +2,7 @@ ARG PYTORCH="1.9.0"
 ARG CUDA="11.1"
 ARG CUDNN="8"
 
-# docker build -t mmcv/mmcv:gtx3090 . -f gtx3090.dockerfile
+# docker build -t ymir/yolov5:cuda111 -f det-yolov5-tmi/cuda111.dockerfile .
 # cuda11.3 + pytorch 1.10.0
 # cuda11.1 + pytorch 1.9.0
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-runtime
@@ -28,27 +28,26 @@ RUN pip install -i https://mirrors.aliyun.com/pypi/simple -U pip && \
 	tensorboard==2.5.0 numba progress yacs pthflops imagesize pydantic pytest \
 	scipy pydantic pyyaml imagesize opencv-python thop pandas seaborn
 
-WORKDIR /app
-ADD ./det-yolov5 /app
+ADD ./det-yolov5-tmi /app
+RUN mkdir /img-man && cp /app/*-template.yaml /img-man/
 # RUN pip install -r requirements.txt 
 
 # 如果在内网使用，需要提前下载好yolov5 v6.1的权重与字体Arial.tff到指定目录
-# COPY yolov5*.pt /app/
-### wget https://ultralytics.com/assets/Arial.ttf to /root/.config/Ultralytics/Arial.ttf
-# RUN mkdir -p /root/.config/Ultralytics
-# COPY ./training/yolov5/Arial.ttf /root/.config/Ultralytics/Arial.ttf
+# COPY ./yolov5*.pt /app/
+# wget https://ultralytics.com/assets/Arial.ttf to /root/.config/Ultralytics/Arial.ttf
 
 # make PYTHONPATH include mmdetection and executor
 ENV PYTHONPATH=.
 
 # tmi framework and your app
-COPY sample_executor /sample_executor
-RUN pip install -e /sample_executor
-RUN mkdir /img-man
-COPY ./det-yolov5/*-template.yaml /img-man/
+RUN git config --global user.name "yzbx" && \
+    git config --global user.email "youdaoyzbx@163.com" && \
+    git clone http://192.168.70.8/wangjiaxin/ymir-executor.git -b executor ~/.git/ymir-executor && \
+    pip install -e ~/.git/ymir-executor/executor
 
 # dependencies: write other dependencies here (pytorch, mxnet, tensorboard-x, etc.)
 
+WORKDIR /app
 # entry point for your app
 # the whole docker image will be started with `nvidia-docker run <other options> <docker-image-name>`
 # and this command will run automatically

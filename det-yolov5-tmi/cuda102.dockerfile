@@ -1,10 +1,8 @@
 ARG PYTORCH="1.8.1"
 ARG CUDA="10.2"
 ARG CUDNN="7"
-ARG ssh_prv_key=""
-ARG ssh_pub_key=""
 
-# docker build -t ymir/yolov5:cuda102 -f det-yolov5-tmi/cuda102.dockerfile --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa)" --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --squash .
+# docker build -t ymir/yolov5:cuda102 -f det-yolov5-tmi/cuda102.dockerfile .
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-runtime
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
@@ -39,20 +37,11 @@ RUN mkdir /img-man && cp /app/*-template.yaml /img-man/
 # make PYTHONPATH include mmdetection and executor
 ENV PYTHONPATH=.
 
-RUN mkdir -p /root/.ssh && \
-    echo "$ssh_prv_key" > /root/.ssh/id_rsa && \
-    echo "$ssh_pub_key" > /root/.ssh/id_rsa.pub && \
-    chmod 600 /root/.ssh/id_rsa && \
-    chmod 600 /root/.ssh/id_rsa.pub
-
 # tmi framework and your app
 RUN git config --global user.name "yzbx" && \
     git config --global user.email "youdaoyzbx@163.com" && \
-    git clone git@github.com:yzbx/ymir-executor.git -b executor ~/.git/executor && \
-    RUN pip install -e ~/.git/executor/executor
-
-# Remove SSH keys
-RUN rm -rf /root/.ssh/
+    git clone http://192.168.70.8/wangjiaxin/ymir-executor.git -b executor ~/.git/ymir-executor && \
+    pip install -e ~/.git/ymir-executor/executor
 
 # dependencies: write other dependencies here (pytorch, mxnet, tensorboard-x, etc.)
 
