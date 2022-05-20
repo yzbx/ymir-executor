@@ -8,9 +8,19 @@ import time
 from typing import List
 import subprocess
 import shutil
-
+import argparse
 from executor import dataset_reader as dr, env, monitor, result_writer as rw
 from utils.ymir_yolov5 import convert_ymir_to_yolov5
+
+def get_args():
+    parser=argparse.ArgumentParser('debug ...')
+    parser.add_argument('--app',default=None,
+        help='training, mining or infer',
+        choices=['training','mining','infer'])
+    parser.add_argument('--cfg',default=None,
+        help='set the /in/config.yaml')
+
+    return parser.parse_args()
 
 def start() -> int:
     env_config = env.get_current_env()
@@ -18,12 +28,30 @@ def start() -> int:
     logger.add(osp.join(env_config.output.root_dir,'ymir_start.log'))
 
     logger.info(f'env_config: {env_config}')
-    if env_config.run_training:
+
+    args=get_args()
+    logger.info(f'args: {args}')
+
+    if args.cfg is not None:
+        default_cfg_file=env_config.input.config_file
+        
+        if osp.exists(default_cfg_file):
+            shutil.copy(default_cfg_file,default_cfg_file+'.backup')
+        
+        shutil.copy(args.cfg,default_cfg_file)
+
+    if args.app=='training':
         _run_training(env_config)
-    # if env_config.run_mining:
-    #     _run_mining(env_config)
-    # if env_config.run_infer:
-    #     _run_infer(env_config)
+    elif args.app=='mining':
+        _run_mining(env_config)
+    elif args.app=='infer':
+        _run_infer(env_config)
+    elif env_config.run_training:
+        _run_training(env_config)
+    elif env_config.run_mining :
+        _run_mining(env_config)
+    elif env_config.run_infer:
+        _run_infer(env_config)
 
     return 0
 
@@ -90,8 +118,6 @@ def _run_mining(env_config: env.EnvConfig) -> None:
     #! use `env.get_executor_config` to get config file for training
     #   models are transfered in executor_config's model_params_path
     executor_config = env.get_executor_config()
-    idle_seconds: float = executor_config.get('idle_seconds', 60)
-    trigger_crash: bool = executor_config.get('trigger_crash', False)
     #! use `logging` or `print` to write log to console
     logging.info(f"mining config: {executor_config}")
 
@@ -99,7 +125,6 @@ def _run_mining(env_config: env.EnvConfig) -> None:
     #   note that annotations path will be empty str if there's no annotations in that dataset
     asset_paths = []
     for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
-        logging.info(f"asset: {asset_path}")
         asset_paths.append(asset_path)
 
     if len(asset_paths) == 0:
@@ -109,7 +134,15 @@ def _run_mining(env_config: env.EnvConfig) -> None:
     logging.info(f"assets count: {len(asset_paths)}")
     monitor.write_monitor_logger(percent=0.5)
 
-    _dummy_work(idle_seconds=idle_seconds, trigger_crash=trigger_crash)
+    logger.info(f'start convert ymir dataset to yolov5 dataset')
+    monitor.write_monitor_logger(percent=0.01)
+    out_dir = osp.join(env_config.output.root_dir,'yolov5_dataset')
+    convert_ymir_to_yolov5(out_dir)
+    logger.info(f'convert ymir dataset to yolov5 dataset finished!!!')
+    monitor.write_monitor_logger(percent=0.1)
+
+    command = f'python mining/mining_cald.py'
+    subprocess.check_output(command.split())
 
     #! write mining result
     #   here we give a fake score to each assets
