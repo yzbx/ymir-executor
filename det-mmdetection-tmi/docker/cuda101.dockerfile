@@ -2,7 +2,7 @@ ARG PYTORCH="1.6.0"
 ARG CUDA="10.1"
 ARG CUDNN="7"
 
-# docker build -t ymir/mmcv:cuda101 . -f det-mmdetection-tmi/cuda101.dockerfile
+# docker build -t ymir/mmcv:cuda101 . -f det-mmdetection-tmi/docker/cuda101.dockerfile
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-runtime
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
