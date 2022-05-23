@@ -9,6 +9,117 @@ import yaml
 import numpy as np
 from executor import dataset_reader as dr, env, monitor, result_writer as rw
 from utils.datasets import img2label_paths
+import torch
+from loguru import logger
+from models.common import DetectMultiBackend
+from utils.general import check_img_size, non_max_suppression, scale_coords
+from utils.augmentations import letterbox
+from utils.torch_utils import select_device
+
+class Ymir_Yolov5():
+    def __init__(self):
+        executor_config=env.get_executor_config()
+        gpu_id=executor_config['gpu_id']
+        gpu_num=len(gpu_id.split(','))
+        if gpu_num==0:
+            device='cpu'
+        else:
+            device=gpu_id
+        device = select_device(device)
+
+        self.model=self.init_detector(device)
+        self.device=device
+        self.class_names=executor_config['class_names']
+
+        self.stride=self.model.stride
+        imgsz = (640, 640)
+        imgsz = check_img_size(imgsz, s=self.stride)
+        # Run inference
+        self.model.warmup(imgsz=(1 , 3, *imgsz), half=False)  # warmup
+
+        self.img_size=imgsz
+
+    def init_detector(self, device):
+        executor_config=env.get_executor_config()
+        path_config=env.get_current_env()
+
+        weights = None
+        model_params_path = executor_config['model_params_path']
+        model_dir = osp.join(path_config.input.root_dir,
+            path_config.input.models_dir)
+        model_params_path = [p for p in model_params_path if osp.exists(osp.join(model_dir,p))]
+        if 'best.pt' in model_params_path:
+            weights = osp.join(model_dir,'best.pt')
+        else:
+            for f in model_params_path:
+                if f.endswith('.pt'):
+                    weights=osp.join(model_dir,f)
+                    break 
+        
+        if weights is None:
+            weights = 'yolov5s.pt'
+            logger.info(f'cannot find pytorch weight in {model_params_path}, use {weights} instead')
+
+        model = DetectMultiBackend(weights=weights,
+            device=device,
+            dnn=False, # not use opencv dnn for onnx inference
+            data='data.yaml') # dataset.yaml path
+
+        return model
+
+    def predict(self, img):
+        # preprocess 
+        # img0 = cv2.imread(path)  # BGR
+        # Padded resize
+        img1 = letterbox(img, self.img_size, stride=self.stride, auto=True)[0]
+
+        # Convert
+        img1 = img1.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        img1 = np.ascontiguousarray(img1)
+        img1 = torch.from_numpy(img1).to(self.device)
+
+        img1 = img1/255  # 0 - 255 to 0.0 - 1.0
+        if len(img1.shape) == 3:
+            img1 = img1[None]  # expand for batch dim
+
+        pred = self.model(img1)
+
+        # postprocess
+        conf_thres=0.25
+        iou_thres=0.45
+        classes=None
+        agnostic_nms=False
+        max_det=1000
+        
+        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        
+        result=[]
+        for i, det in enumerate(pred):
+            if len(det):
+                # Rescale boxes from img_size to img size
+                det[:, :4] = scale_coords(img1.shape[2:], det[:, :4], img.shape).round()
+                result.append(det)
+
+        # xyxy, conf, cls
+        if len(result)>0:
+            result=torch.cat(result,dim=0)
+            result=result.data.cpu().numpy()
+
+        return result
+
+    def infer(self, img):
+        anns=[]
+        result = self.predict(img)
+        if result == []:
+            anns = []
+        else:
+            for i in range(result.shape[0]):
+                xmin, ymin, xmax, ymax, conf, cls = result[i,:6].tolist()
+                ann = rw.Annotation(class_name=self.class_names[int(cls)], score=conf, box=rw.Box(x=int(xmin), y=int(ymin), w=int(xmax-xmin), h=int(ymax-ymin)))
+
+                anns.append(ann)
+
+        return anns
 
 def convert_ymir_to_yolov5(root_dir,args=None):
     os.makedirs(root_dir,exist_ok=True)

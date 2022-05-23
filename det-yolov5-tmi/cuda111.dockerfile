@@ -1,10 +1,11 @@
-ARG PYTORCH="1.9.0"
+ARG PYTORCH="1.8.0"
 ARG CUDA="11.1"
 ARG CUDNN="8"
 
 # docker build -t ymir/yolov5:cuda111 -f det-yolov5-tmi/cuda111.dockerfile .
 # cuda11.3 + pytorch 1.10.0
-# cuda11.1 + pytorch 1.9.0
+# cuda11.1 + pytorch 1.9.0 + cudnn8 not work!!!
+# conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 cudatoolkit=11.1 -c pytorch -c conda-forge
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-runtime
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"

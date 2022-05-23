@@ -7,6 +7,5 @@
 # model_params_path: []
 # class_names: []
 
-model: 'yolov5s'
-batch_size: 16
+# batch_size: 16
 img_size: 640

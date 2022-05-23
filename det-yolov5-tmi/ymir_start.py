@@ -1,7 +1,7 @@
 import logging
-from xmlrpc.server import resolve_dotted_attribute
 from loguru import logger 
 import os
+import cv2
 import os.path as osp
 import sys
 import time
@@ -10,7 +10,7 @@ import subprocess
 import shutil
 import argparse
 from executor import dataset_reader as dr, env, monitor, result_writer as rw
-from utils.ymir_yolov5 import convert_ymir_to_yolov5
+from utils.ymir_yolov5 import convert_ymir_to_yolov5, Ymir_Yolov5
 
 def get_args():
     parser=argparse.ArgumentParser('debug ...')
@@ -146,9 +146,9 @@ def _run_mining(env_config: env.EnvConfig) -> None:
 
     #! write mining result
     #   here we give a fake score to each assets
-    total_length = len(asset_paths)
-    mining_result = [(asset_path, index / total_length) for index, asset_path in enumerate(asset_paths)]
-    rw.write_mining_result(mining_result=mining_result)
+    # total_length = len(asset_paths)
+    # mining_result = [(asset_path, index / total_length) for index, asset_path in enumerate(asset_paths)]
+    # rw.write_mining_result(mining_result=mining_result)
 
     #! if task done, write 100% percent log
     logging.info('mining done')
@@ -160,8 +160,6 @@ def _run_infer(env_config: env.EnvConfig) -> None:
     #   models are transfered in executor_config's model_params_path
     executor_config = env.get_executor_config()
     class_names = executor_config['class_names']
-    idle_seconds: float = executor_config.get('idle_seconds', 60)
-    trigger_crash: bool = executor_config.get('trigger_crash', False)
     #! use `logging` or `print` to write log to console
     logging.info(f"infer config: {executor_config}")
 
@@ -179,11 +177,22 @@ def _run_infer(env_config: env.EnvConfig) -> None:
     logging.info(f"assets count: {len(asset_paths)}")
     monitor.write_monitor_logger(percent=0.5)
 
-    _dummy_work(idle_seconds=idle_seconds, trigger_crash=trigger_crash)
+    infer_result=dict()
+    model=Ymir_Yolov5()
+    for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
+        logging.info(f"asset: {asset_path}")
+        asset_paths.append(asset_path)
+
+        img_path=osp.join(env_config.input.root_dir, env_config.input.assets_dir, asset_path)
+        img = cv2.imread(img_path)
+
+        result = model.infer(img)
+
+        infer_result[asset_path]=result
 
     #! write infer result
-    fake_annotation = rw.Annotation(class_name=class_names[0], score=0.9, box=rw.Box(x=50, y=50, w=150, h=150))
-    infer_result = {asset_path: [fake_annotation] for asset_path in asset_paths}
+    # fake_annotation = rw.Annotation(class_name=class_names[0], score=0.9, box=rw.Box(x=50, y=50, w=150, h=150))
+    # infer_result = {asset_path: [fake_annotation] for asset_path in asset_paths}
     rw.write_infer_result(infer_result=infer_result)
 
     #! if task done, write 100% percent log

@@ -29,10 +29,12 @@ def intersect(boxes1, boxes2):
 
 def horizontal_flip(image, bbox):
     image = image.copy()
-    bbox = bbox.copy()
+    
     height, width = image.shape[:2]
     image = image[:, ::-1, :]
-    bbox[:, [0, 2]] = width - bbox[:, [2, 0]]
+    if len(bbox) > 0:
+        bbox = bbox.copy()
+        bbox[:, [0, 2]] = width - bbox[:, [2, 0]]
     return image, bbox
 
 
@@ -49,6 +51,10 @@ def cutout(image, bbox, cut_num=2, fill_val=0, bbox_remove_thres=0.4, bbox_min_t
     '''
     image = image.copy()
     bbox = bbox.copy()
+
+    if len(bbox)==0:
+        return image, bbox 
+
     original_h, original_w, original_channel = image.shape
     count = 0
     for _ in range(50):
@@ -90,16 +96,18 @@ def my_rotate(image, bbox, rot=5):
     h, w, c = image.shape
     rotate_matirc = cv2.getRotationMatrix2D((w // 2, h // 2), rot, 1.0)
     image = cv2.warpAffine(image, rotate_matirc, (w, h), flags=cv2.INTER_LINEAR)
-    for i in range(bbox.shape[0]):
-        x1, y1 = my_get_affine_transform([bbox[i][0], bbox[i][1]], rotate_matirc)
-        x2, y2 = my_get_affine_transform([bbox[i][0], bbox[i][3]], rotate_matirc)
-        x3, y3 = my_get_affine_transform([bbox[i][2], bbox[i][1]], rotate_matirc)
-        x4, y4 = my_get_affine_transform([bbox[i][2], bbox[i][3]], rotate_matirc)
-        xmin = min(x1, x2, x3, x4)
-        xmax = max(x1, x2, x3, x4)
-        ymin = min(y1, y2, y3, y4)
-        ymax = max(y1, y2, y3, y4)
-        bbox[i] = [xmin, ymin, xmax, ymax]
+
+    if len(bbox)>0:
+        for i in range(bbox.shape[0]):
+            x1, y1 = my_get_affine_transform([bbox[i][0], bbox[i][1]], rotate_matirc)
+            x2, y2 = my_get_affine_transform([bbox[i][0], bbox[i][3]], rotate_matirc)
+            x3, y3 = my_get_affine_transform([bbox[i][2], bbox[i][1]], rotate_matirc)
+            x4, y4 = my_get_affine_transform([bbox[i][2], bbox[i][3]], rotate_matirc)
+            xmin = min(x1, x2, x3, x4)
+            xmax = max(x1, x2, x3, x4)
+            ymin = min(y1, y2, y3, y4)
+            ymax = max(y1, y2, y3, y4)
+            bbox[i] = [xmin, ymin, xmax, ymax]
     return image, bbox
 
 
@@ -110,13 +118,14 @@ def rotate(image, bbox, rot=5):
     center = np.array([w / 2.0, h / 2.0])
     s = max(h, w) * 1.0
     trans = get_affine_transform(center, s, rot, [w, h])
-    for i in range(bbox.shape[0]):
-        x1, y1 = affine_transform(bbox[i, :2], trans)
-        x2, y2 = affine_transform(bbox[i, 2:], trans)
-        x3, y3 = affine_transform(bbox[i, [2, 1]], trans)
-        x4, y4 = affine_transform(bbox[i, [0, 3]], trans)
-        bbox[i, :2] = [min(x1, x2, x3, x4), min(y1, y2, y3, y4)]
-        bbox[i, 2:] = [max(x1, x2, x3, x4), max(y1, y2, y3, y4)]
+    if len(bbox)>0:
+        for i in range(bbox.shape[0]):
+            x1, y1 = affine_transform(bbox[i, :2], trans)
+            x2, y2 = affine_transform(bbox[i, 2:], trans)
+            x3, y3 = affine_transform(bbox[i, [2, 1]], trans)
+            x4, y4 = affine_transform(bbox[i, [0, 3]], trans)
+            bbox[i, :2] = [min(x1, x2, x3, x4), min(y1, y2, y3, y4)]
+            bbox[i, 2:] = [max(x1, x2, x3, x4), max(y1, y2, y3, y4)]
     image = cv2.warpAffine(image, trans, (w, h), flags = cv2.INTER_LINEAR)
     return image, bbox
 
@@ -191,7 +200,11 @@ def resize(img, boxes, ratio=0.8):
     resize_img = cv2.resize(img, (ow, oh))
     new_img = img * 0
     new_img[:oh, :ow] = resize_img
-    return new_img, boxes * ratio
+
+    if len(boxes)==0:
+        return new_img, boxes 
+    else:
+        return new_img, boxes * ratio
 
 
 if __name__ == '__main__':
