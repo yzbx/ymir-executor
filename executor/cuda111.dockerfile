@@ -31,7 +31,7 @@ RUN pip install -i https://mirrors.aliyun.com/pypi/simple -U pip && \
 # tmi framework and your app
 # COPY app /app --> git clone git-url -b git-branch -o /app
 RUN mkdir -p /img-man /app
-COPY executor/app/*-template.yaml /img-man/
+COPY executor/app/*.yaml /img-man/
 ADD executor /executor
 RUN pip install -e /executor
 
