@@ -11,7 +11,7 @@ def main():
     git_url=executor_config['git_url']
     git_branch=executor_config['git_branch']
 
-    cmd=f'git clone {git_url} -b {git_branch} -o /app' 
+    cmd=f'git clone {git_url} -b {git_branch} /app' 
     subprocess.check_output(cmd.split())
 
     # step 2. read /app/extra-requirements.txt and install it.
