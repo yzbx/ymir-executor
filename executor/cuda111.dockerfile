@@ -43,4 +43,4 @@ RUN git config --global user.name "zhangsan" && \
 # entry point for your app
 # the whole docker image will be started with `nvidia-docker run <other options> <docker-image-name>`
 # and this command will run automatically
-CMD python /sample_executor/ymir_start.py
+CMD python /executor/ymir_start.py
