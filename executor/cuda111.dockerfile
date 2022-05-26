@@ -1,4 +1,4 @@
-ARG PYTORCH="1.9.0"
+ARG PYTORCH="1.8.0"
 ARG CUDA="11.1"
 ARG CUDNN="8"
 
@@ -31,14 +31,14 @@ RUN pip install -i https://mirrors.aliyun.com/pypi/simple -U pip && \
 # tmi framework and your app
 # COPY app /app --> git clone git-url -b git-branch -o /app
 RUN mkdir -p /img-man /app
-COPY sample_executor/app/*-template.yaml /img-man/
-COPY sample_executor /sample_executor
-RUN pip install -e /sample_executor/executor
+COPY executor/app/*-template.yaml /img-man/
+ADD executor /executor
+RUN pip install -e /executor
 
 ENV PYTHONPATH=.
 
-# RUN git config --global --user.name "" && \
-#     git config --global --user.email "zhang3@163.com" 
+RUN git config --global user.name "zhangsan" && \
+    git config --global user.email "zhangsan@163.com" 
 
 # entry point for your app
 # the whole docker image will be started with `nvidia-docker run <other options> <docker-image-name>`
