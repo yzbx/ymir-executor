@@ -33,18 +33,22 @@ ADD ./det-yolov5-tmi /app
 RUN mkdir /img-man && cp /app/*-template.yaml /img-man/
 # RUN pip install -r requirements.txt 
 
-# 如果在内网使用，需要提前下载好yolov5 v6.1的权重与字体Arial.tff到指定目录
-# COPY ./yolov5*.pt /app/
-# wget https://ultralytics.com/assets/Arial.ttf to /root/.config/Ultralytics/Arial.ttf
+# for local network
+COPY ./det-yolov5-tmi/yolov5*.pt /app/
+RUN mkdir -p /workspace/.git
+ADD ymir-executor /workspace/.git/ymir-executor
+RUN pip install -e /workspace/.git/ymir-executor/executor
+RUN mkdir -p /root/.config/Ultralytics && \
+    wget https://ultralytics.com/assets/Arial.ttf -O /root/.config/Ultralytics/Arial.ttf
 
 # make PYTHONPATH include mmdetection and executor
 ENV PYTHONPATH=.
 
 # tmi framework and your app
-RUN git config --global user.name "yzbx" && \
-    git config --global user.email "youdaoyzbx@163.com" && \
-    git clone http://192.168.70.8/wangjiaxin/ymir-executor.git -b executor ~/.git/ymir-executor && \
-    pip install -e ~/.git/ymir-executor/executor
+# RUN git config --global user.name "yzbx" && \
+#     git config --global user.email "youdaoyzbx@163.com" && \
+#     git clone http://192.168.70.8/wangjiaxin/ymir-executor.git -b executor ~/.git/ymir-executor && \
+#     pip install -e ~/.git/ymir-executor/executor
 
 # dependencies: write other dependencies here (pytorch, mxnet, tensorboard-x, etc.)
 
