@@ -10,7 +10,7 @@ import subprocess
 import shutil
 import argparse
 from executor import dataset_reader as dr, env, monitor, result_writer as rw
-from utils.ymir_yolov5 import convert_ymir_to_yolov5, Ymir_Yolov5
+from utils.ymir_yolov5 import ymir_process_config, convert_ymir_to_yolov5, Ymir_Yolov5
 
 def get_args():
     parser=argparse.ArgumentParser('debug ...')
@@ -71,11 +71,10 @@ def _run_training(env_config: env.EnvConfig) -> None:
     logging.info(f"training config: {executor_config}")
     
     logger.info(f'start convert ymir dataset to yolov5 dataset')
-    monitor.write_monitor_logger(percent=0.01)
     out_dir = osp.join(env_config.output.root_dir,'yolov5_dataset')
     convert_ymir_to_yolov5(out_dir)
     logger.info(f'convert ymir dataset to yolov5 dataset finished!!!')
-    monitor.write_monitor_logger(percent=0.1)
+    monitor.write_monitor_logger(percent=ymir_process_config['preprocess'])
 
     
     epochs = executor_config['epochs']
@@ -95,7 +94,7 @@ def _run_training(env_config: env.EnvConfig) -> None:
 
     # os.system(command)
     subprocess.check_output(command.split())
-    monitor.write_monitor_logger(percent=0.9)
+    monitor.write_monitor_logger(percent=ymir_process_config['preprocess']+ymir_process_config['task'])
 
     # convert to onnx 
     logging.info('convert to onnx '+'*'*50)
@@ -121,25 +120,11 @@ def _run_mining(env_config: env.EnvConfig) -> None:
     #! use `logging` or `print` to write log to console
     logging.info(f"mining config: {executor_config}")
 
-    #! use `dataset_reader.item_paths` to read candidate dataset items
-    #   note that annotations path will be empty str if there's no annotations in that dataset
-    asset_paths = []
-    for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
-        asset_paths.append(asset_path)
-
-    if len(asset_paths) == 0:
-        raise ValueError('empty asset paths')
-
-    #! use `monitor.write_monitor_logger` to write task process to monitor.txt
-    logging.info(f"assets count: {len(asset_paths)}")
-    monitor.write_monitor_logger(percent=0.5)
-
     logger.info(f'start convert ymir dataset to yolov5 dataset')
-    monitor.write_monitor_logger(percent=0.01)
     out_dir = osp.join(env_config.output.root_dir,'yolov5_dataset')
     convert_ymir_to_yolov5(out_dir)
     logger.info(f'convert ymir dataset to yolov5 dataset finished!!!')
-    monitor.write_monitor_logger(percent=0.1)
+    monitor.write_monitor_logger(percent=ymir_process_config['preprocess'])
 
     command = f'python mining/mining_cald.py'
     subprocess.check_output(command.split())
@@ -163,35 +148,22 @@ def _run_infer(env_config: env.EnvConfig) -> None:
     #! use `logging` or `print` to write log to console
     logging.info(f"infer config: {executor_config}")
 
-    #! use `dataset_reader.item_paths` to read candidate dataset items
-    #   note that annotations path will be empty str if there's no annotations in that dataset
-    asset_paths: List[str] = []
-    for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
-        logging.info(f"asset: {asset_path}")
-        asset_paths.append(asset_path)
-
-    if len(asset_paths) == 0 or len(class_names) == 0:
-        raise ValueError('empty asset paths or class names')
-
     # generate data.yaml for infer
     logger.info(f'start convert ymir dataset to yolov5 dataset')
-    monitor.write_monitor_logger(percent=0.01)
     out_dir = osp.join(env_config.output.root_dir,'yolov5_dataset')
     convert_ymir_to_yolov5(out_dir)
     logger.info(f'convert ymir dataset to yolov5 dataset finished!!!')
-    monitor.write_monitor_logger(percent=0.1)
+    monitor.write_monitor_logger(percent=ymir_process_config['preprocess'])
 
     #! use `monitor.write_monitor_logger` to write log to console and write task process percent to monitor.txt
-    logging.info(f"assets count: {len(asset_paths)}")
-    N=len(asset_paths)
+    N=dr.items_count(env.DatasetType.CANDIDATE)
+    logging.info(f"assets count: {N}")
+    
 
     infer_result=dict()
     model=Ymir_Yolov5()
     idx=0
     for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
-        logging.info(f"asset: {asset_path}")
-        asset_paths.append(asset_path)
-
         img_path=osp.join(env_config.input.root_dir, env_config.input.assets_dir, asset_path)
         img = cv2.imread(img_path)
 
@@ -199,7 +171,7 @@ def _run_infer(env_config: env.EnvConfig) -> None:
 
         infer_result[asset_path]=result
         idx+=1
-        monitor.write_monitor_logger(percent=0.1+0.9*idx/N)
+        monitor.write_monitor_logger(percent=ymir_process_config['preprocess']+ymir_process_config['task']*idx/N)
 
     #! write infer result
     # fake_annotation = rw.Annotation(class_name=class_names[0], score=0.9, box=rw.Box(x=50, y=50, w=150, h=150))
@@ -209,14 +181,6 @@ def _run_infer(env_config: env.EnvConfig) -> None:
     #! if task done, write 100% percent log
     logging.info('infer done')
     monitor.write_monitor_logger(percent=1.0)
-
-
-def _dummy_work(idle_seconds: float, trigger_crash: bool = False, gpu_memory_size: int = 0) -> None:
-    if idle_seconds > 0:
-        time.sleep(idle_seconds)
-    if trigger_crash:
-        raise RuntimeError('app crashed')
-
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout,

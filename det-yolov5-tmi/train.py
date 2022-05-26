@@ -56,7 +56,7 @@ from utils.loss import ComputeLoss
 from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels
 from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
-from utils.ymir_yolov5 import write_ymir_training_result
+from utils.ymir_yolov5 import ymir_process_config,write_ymir_training_result
 from executor import monitor 
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
@@ -287,7 +287,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         model.train()
 
         # ymir monitor
-        monitor.write_monitor_logger(percent=0.1+0.8*epoch/epochs)
+        monitor.write_monitor_logger(percent=ymir_process_config['preprocess']+ymir_process_config['task']*epoch/epochs)
 
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:

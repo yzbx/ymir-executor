@@ -16,6 +16,12 @@ from utils.general import check_img_size, non_max_suppression, scale_coords
 from utils.augmentations import letterbox
 from utils.torch_utils import select_device
 
+# const value for process
+ymir_process_config=dict(
+    preprocess=0.1,
+    task=0.8,
+    postprocess=0.1)
+
 class Ymir_Yolov5():
     def __init__(self):
         executor_config=env.get_executor_config()
@@ -121,6 +127,12 @@ class Ymir_Yolov5():
 
         return anns
 
+def digit(x):
+    if x<10:
+        return 1
+    else:
+        return 1+digit(x//10)
+
 def convert_ymir_to_yolov5(root_dir,args=None):
     os.makedirs(root_dir,exist_ok=True)
     os.makedirs(osp.join(root_dir,'images'),exist_ok=True)
@@ -129,24 +141,24 @@ def convert_ymir_to_yolov5(root_dir,args=None):
     if args is None:
         env_config = env.get_current_env()
         if env_config.run_training:
-            train_data_size=dr.dataset_size(env.DatasetType.TRAINING)
-            val_data_size=dr.dataset_size(env.DatasetType.VALIDATION)
+            train_data_size=dr.items_count(env.DatasetType.TRAINING)
+            val_data_size=dr.items_count(env.DatasetType.VALIDATION)
             N=len(str(train_data_size+val_data_size))
             splits=['train','val']
         elif env_config.run_mining:
-            N=dr.dataset_size(env.DatasetType.CANDIDATE)
+            N=dr.items_count(env.DatasetType.CANDIDATE)
             splits=['test']
         elif env_config.run_infer:
-            N=dr.dataset_size(env.DatasetType.CANDIDATE)
+            N=dr.items_count(env.DatasetType.CANDIDATE)
             splits=['test']
     else:
         if args.app == 'training':
-            train_data_size=dr.dataset_size(env.DatasetType.TRAINING)
-            val_data_size=dr.dataset_size(env.DatasetType.VALIDATION)
+            train_data_size=dr.items_count(env.DatasetType.TRAINING)
+            val_data_size=dr.items_count(env.DatasetType.VALIDATION)
             N=len(str(train_data_size+val_data_size))
             splits=['train','val']
         else:
-            N=dr.dataset_size(env.DatasetType.CANDIDATE)
+            N=dr.items_count(env.DatasetType.CANDIDATE)
             splits=['test']
 
     idx=0
@@ -154,29 +166,30 @@ def convert_ymir_to_yolov5(root_dir,args=None):
         val=env.DatasetType.VALIDATION,
         test=env.DatasetType.CANDIDATE)
 
+    digit_num=digit(N)
     path_env = env.get_current_env()
     for split in splits:
         split_imgs=[]
         for asset_path, annotation_path in dr.item_paths(dataset_type=DatasetTypeDict[split]):
             idx+=1
+            monitor.write_monitor_logger(percent=ymir_process_config['preprocess']*idx/N)
             asset_path=osp.join(path_env.input.root_dir, path_env.input.assets_dir, asset_path)
             
             assert osp.exists(asset_path),f'cannot find {asset_path}'
             
+            # valid data.yaml for training task
+            # invalid data.yaml for infer and mining task
             if split in ['train','val']:
                 annotation_path=osp.join(path_env.input.root_dir, path_env.input.annotations_dir, annotation_path)
                 assert osp.exists(annotation_path),f'cannot find {annotation_path}'
 
-            img_suffix=osp.splitext(asset_path)[1]
-            img_path=osp.join(root_dir,'images',str(idx).zfill(N)+img_suffix)
-            shutil.copy(asset_path, img_path)
-
-            if split in ['train','val']:
-                ann_path=osp.join(root_dir,'labels',str(idx).zfill(N)+'.txt')
+                img_suffix=osp.splitext(asset_path)[1]
+                img_path=osp.join(root_dir,'images',str(idx).zfill(digit_num)+img_suffix)
+                shutil.copy(asset_path, img_path)
+                ann_path=osp.join(root_dir,'labels',str(idx).zfill(digit_num)+'.txt')
                 yolov5_ann_path=img2label_paths([img_path])[0]
                 assert  yolov5_ann_path== ann_path, f'bad yolov5_ann_path={yolov5_ann_path} and ann_path = {ann_path}'
 
-            
                 width, height = imagesize.get(img_path)
                 with open(ann_path,'w') as fw:
                     with open(annotation_path,'r') as fr:
