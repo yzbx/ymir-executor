@@ -173,12 +173,21 @@ def _run_infer(env_config: env.EnvConfig) -> None:
     if len(asset_paths) == 0 or len(class_names) == 0:
         raise ValueError('empty asset paths or class names')
 
+    # generate data.yaml for infer
+    logger.info(f'start convert ymir dataset to yolov5 dataset')
+    monitor.write_monitor_logger(percent=0.01)
+    out_dir = osp.join(env_config.output.root_dir,'yolov5_dataset')
+    convert_ymir_to_yolov5(out_dir)
+    logger.info(f'convert ymir dataset to yolov5 dataset finished!!!')
+    monitor.write_monitor_logger(percent=0.1)
+
     #! use `monitor.write_monitor_logger` to write log to console and write task process percent to monitor.txt
     logging.info(f"assets count: {len(asset_paths)}")
-    monitor.write_monitor_logger(percent=0.5)
+    N=len(asset_paths)
 
     infer_result=dict()
     model=Ymir_Yolov5()
+    idx=0
     for asset_path, _ in dr.item_paths(dataset_type=env.DatasetType.CANDIDATE):
         logging.info(f"asset: {asset_path}")
         asset_paths.append(asset_path)
@@ -189,6 +198,8 @@ def _run_infer(env_config: env.EnvConfig) -> None:
         result = model.infer(img)
 
         infer_result[asset_path]=result
+        idx+=1
+        monitor.write_monitor_logger(percent=0.1+0.9*idx/N)
 
     #! write infer result
     # fake_annotation = rw.Annotation(class_name=class_names[0], score=0.9, box=rw.Box(x=50, y=50, w=150, h=150))

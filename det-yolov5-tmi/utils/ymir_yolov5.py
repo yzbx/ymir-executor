@@ -19,7 +19,7 @@ from utils.torch_utils import select_device
 class Ymir_Yolov5():
     def __init__(self):
         executor_config=env.get_executor_config()
-        gpu_id=executor_config['gpu_id']
+        gpu_id=executor_config.get('gpu_id','0')
         gpu_num=len(gpu_id.split(','))
         if gpu_num==0:
             device='cpu'
