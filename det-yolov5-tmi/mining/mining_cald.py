@@ -1,16 +1,9 @@
-import os
 import os.path as osp
-from re import A
-from cv2 import CAP_PROP_XI_LENS_FEATURE_SELECTOR
 import numpy as np
-import yaml
-import time
 from tqdm import tqdm
 from mining.data_augment import horizontal_flip, cutout, rotate, intersect, resize
 # from mmdet.apis import inference_detector, init_detector
-import torch
 from scipy.stats import entropy
-from concurrent.futures import ThreadPoolExecutor
 import cv2
 from executor import dataset_reader as dr, env, monitor, result_writer as rw
 
@@ -60,7 +53,7 @@ class MiningCald(Ymir_Yolov5):
             return bboxes, conf, class_id
 
         path_env = env.get_current_env()
-        N=dr.dataset_size(env.DatasetType.CANDIDATE)
+        N=dr.items_count(env.DatasetType.CANDIDATE)
         idx=0
         beta=1.3
         mining_result=[]
