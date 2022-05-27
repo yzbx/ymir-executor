@@ -47,6 +47,8 @@ from enum import IntEnum, auto
 
 from pydantic import BaseModel
 import yaml
+import os
+import logging
 
 from executor import settings
 
@@ -97,4 +99,49 @@ def get_current_env() -> EnvConfig:
 def get_executor_config() -> dict:
     with open(get_current_env().input.config_file, 'r') as f:
         executor_config = yaml.safe_load(f)
+
     return executor_config
+
+def get_code_config() -> dict:
+    executor_config=get_executor_config()
+    code_config_file = executor_config.get('code_config',None)
+
+    assert 'git_url' in executor_config,f'cannot find git_url in {executor_config}'
+    remote_config=dict(git_url=executor_config['git_url'],
+        git_branch=executor_config.get('git_branch','master'),
+        code_config_file=executor_config.get('code_config',None))
+    # remote_config_file = '/img-man/code-access.yaml'
+    # if os.path.exists(remote_config_file):
+    #     with open(remote_config_file, 'r') as f:
+    #         remote_config = yaml.safe_load(f)
+
+    #     code_config_file = remote_config['code_config']
+    # else:
+    #     code_config_file = None
+
+    if code_config_file == '' or code_config_file is None:
+        return dict()
+    elif not os.path.exists(code_config_file):
+        git_url=remote_config['git_url']
+        git_branch=remote_config['git_branch']
+        logging.info(f'please pull the code {git_url} with branch {git_branch} first')
+        assert False, f"cannot find code config {code_config_file}"
+    else:
+        with open(code_config_file, 'r') as f:
+            return yaml.safe_load(f)
+
+def get_universal_config() -> dict:
+    """
+    merge executor_config and code_config
+    """
+
+    ### exe_cfg overwrite code_cfg
+    exe_cfg = get_executor_config()
+    code_cfg = get_code_config()
+
+    merge_cfg = exe_cfg.copy()
+    for key in code_cfg:
+        if key not in merge_cfg:
+            merge_cfg[key]=code_cfg[key]
+
+    return merge_cfg
