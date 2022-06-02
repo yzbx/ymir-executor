@@ -1,5 +1,5 @@
 """
-convert ymir dataset to yolov5 dataset
+utils function for ymir and yolov5
 """
 import os
 import os.path as osp
@@ -9,7 +9,6 @@ import imagesize
 import numpy as np
 import torch
 import yaml
-from loguru import logger
 from ymir_exc import dataset_reader as dr
 from ymir_exc import env, monitor
 from ymir_exc import result_writer as rw
@@ -27,32 +26,6 @@ TASK_PERCENT = 0.9
 POSTPROCESS_PERCENT = 1.0
 
 
-def get_code_config() -> dict:
-    executor_config = env.get_executor_config()
-    code_config_file = executor_config.get('code_config', '')
-
-    if not code_config_file:
-        return dict()
-    elif not os.path.exists(code_config_file):
-        assert False, f"cannot find code config {code_config_file}"
-    else:
-        with open(code_config_file, 'r') as f:
-            return yaml.safe_load(f)
-
-
-def get_merged_config() -> dict:
-    """
-    merge executor_config and code_config
-    """
-
-    # exe_cfg overwrite code_cfg
-    exe_cfg = env.get_executor_config()
-    code_cfg = get_code_config()
-
-    code_cfg.update(exe_cfg)
-    return code_cfg
-
-
 def get_weight_file(try_download=True) -> str:
     """
     return the weight file path by priority
@@ -61,8 +34,8 @@ def get_weight_file(try_download=True) -> str:
     2. if try_download and no weight file offered
             yolov5 will download it from github.
     """
-    executor_config = get_merged_config()
-    path_config = env.get_current_env()
+    executor_config = env.get_executor_config()
+    ymir_env = env.get_current_env()
 
     env_config = env.get_current_env()
     if env_config.run_training:
@@ -70,8 +43,8 @@ def get_weight_file(try_download=True) -> str:
     else:
         model_params_path = executor_config['model_params_path']
 
-    model_dir = osp.join(path_config.input.root_dir,
-                         path_config.input.models_dir)
+    model_dir = osp.join(ymir_env.input.root_dir,
+                         ymir_env.input.models_dir)
     model_params_path = [p for p in model_params_path if osp.exists(osp.join(model_dir, p))]
 
     # choose weight file by priority, best.pt > xxx.pt > f'{model_name}.pt'
@@ -84,7 +57,7 @@ def get_weight_file(try_download=True) -> str:
 
     # if no weight file offered
     if try_download:
-        model_name = get_merged_config()['model']
+        model_name = executor_config['model']
         weights = attempt_download(f'{model_name}.pt')
         return weights
     else:
@@ -93,7 +66,7 @@ def get_weight_file(try_download=True) -> str:
 
 class YmirYolov5():
     def __init__(self):
-        executor_config = get_merged_config()
+        executor_config = env.get_executor_config()
         gpu_id = executor_config.get('gpu_id', '0')
         gpu_num = len(gpu_id.split(','))
         if gpu_num == 0:
@@ -194,36 +167,26 @@ def digit(x: int) -> int:
     return i
 
 
-def convert_ymir_to_yolov5(root_dir, args=None):
+def convert_ymir_to_yolov5(output_root_dir):
     """
     convert ymir format dataset to yolov5 format
     """
-    os.makedirs(root_dir, exist_ok=True)
-    os.makedirs(osp.join(root_dir, 'images'), exist_ok=True)
-    os.makedirs(osp.join(root_dir, 'labels'), exist_ok=True)
+    os.makedirs(output_root_dir, exist_ok=True)
+    os.makedirs(osp.join(output_root_dir, 'images'), exist_ok=True)
+    os.makedirs(osp.join(output_root_dir, 'labels'), exist_ok=True)
 
-    if args is None:
-        env_config = env.get_current_env()
-        if env_config.run_training:
-            train_data_size = dr.items_count(env.DatasetType.TRAINING)
-            val_data_size = dr.items_count(env.DatasetType.VALIDATION)
-            N = len(str(train_data_size + val_data_size))
-            splits = ['train', 'val']
-        elif env_config.run_mining:
-            N = dr.items_count(env.DatasetType.CANDIDATE)
-            splits = ['test']
-        elif env_config.run_infer:
-            N = dr.items_count(env.DatasetType.CANDIDATE)
-            splits = ['test']
-    else:
-        if args.app == 'training':
-            train_data_size = dr.items_count(env.DatasetType.TRAINING)
-            val_data_size = dr.items_count(env.DatasetType.VALIDATION)
-            N = len(str(train_data_size + val_data_size))
-            splits = ['train', 'val']
-        else:
-            N = dr.items_count(env.DatasetType.CANDIDATE)
-            splits = ['test']
+    env_config = env.get_current_env()
+    if env_config.run_training:
+        train_data_size = dr.items_count(env.DatasetType.TRAINING)
+        val_data_size = dr.items_count(env.DatasetType.VALIDATION)
+        N = len(str(train_data_size + val_data_size))
+        splits = ['train', 'val']
+    elif env_config.run_mining:
+        N = dr.items_count(env.DatasetType.CANDIDATE)
+        splits = ['test']
+    elif env_config.run_infer:
+        N = dr.items_count(env.DatasetType.CANDIDATE)
+        splits = ['test']
 
     idx = 0
     DatasetTypeDict = dict(train=env.DatasetType.TRAINING,
@@ -250,9 +213,9 @@ def convert_ymir_to_yolov5(root_dir, args=None):
                 assert osp.exists(annotation_path), f'cannot find {annotation_path}'
 
                 img_suffix = osp.splitext(asset_path)[1]
-                img_path = osp.join(root_dir, 'images', str(idx).zfill(digit_num) + img_suffix)
+                img_path = osp.join(output_root_dir, 'images', str(idx).zfill(digit_num) + img_suffix)
                 shutil.copy(asset_path, img_path)
-                ann_path = osp.join(root_dir, 'labels', str(idx).zfill(digit_num) + '.txt')
+                ann_path = osp.join(output_root_dir, 'labels', str(idx).zfill(digit_num) + '.txt')
                 yolov5_ann_path = img2label_paths([img_path])[0]
                 assert yolov5_ann_path == ann_path, f'bad yolov5_ann_path={yolov5_ann_path} and ann_path = {ann_path}'
 
@@ -273,12 +236,12 @@ def convert_ymir_to_yolov5(root_dir, args=None):
 
                 split_imgs.append(img_path)
         if split in ['train', 'val']:
-            with open(osp.join(root_dir, f'{split}.txt'), 'w') as fw:
+            with open(osp.join(output_root_dir, f'{split}.txt'), 'w') as fw:
                 fw.write('\n'.join(split_imgs))
 
     # generate data.yaml for training/mining/infer
     config = env.get_executor_config()
-    data = dict(path=root_dir,
+    data = dict(path=output_root_dir,
                 train="train.txt",
                 val="val.txt",
                 test='test.txt',
@@ -299,7 +262,7 @@ def write_ymir_training_result(results, maps, rewrite=False):
         if osp.exists(training_result_file):
             return 0
 
-    executor_config = get_merged_config()
+    executor_config = env.get_executor_config()
     model = executor_config['model']
     class_names = executor_config['class_names']
     map50 = maps

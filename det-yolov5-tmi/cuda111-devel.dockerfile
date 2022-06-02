@@ -40,4 +40,4 @@ RUN mkdir -p /root/.config/Ultralytics && \
 ENV PYTHONPATH=.
 
 WORKDIR /app
-CMD python /app/ymir_start.py
+CMD python3 /app/ymir_start.py
